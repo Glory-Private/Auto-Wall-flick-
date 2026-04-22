@@ -1,0 +1,82 @@
+--한결맘
+
+local RunService = game:GetService("RunService")
+local task = task
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local rootJoint = root:WaitForChild("RootJoint")
+
+local originalC0 = rootJoint.C0
+
+
+local FLICK_UP_FORCE = 52
+local FLICK_PUSH_FORCE = 10
+local DETECTION_RANGE = 1.4 
+local isFlicking = false
+
+
+local function forceUpdate()
+	root.AssemblyLinearVelocity = root.AssemblyLinearVelocity + Vector3.new(0, 0.01, 0)
+end
+
+
+local function canWallHop()
+	local params = RaycastParams.new()
+	params.FilterDescendantsInstances = {character}
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	
+	local lookVec = root.CFrame.LookVector
+	local rightVec = root.CFrame.RightVector
+	
+	
+	local frontCheck = workspace:Raycast(root.Position, lookVec * DETECTION_RANGE, params)
+	if frontCheck then return nil end
+
+	
+	local diagonalDirections = {
+		(lookVec + rightVec).Unit,
+		(lookVec - rightVec).Unit
+	}
+
+	for _, dir in pairs(diagonalDirections) do
+		local result = workspace:Raycast(root.Position, dir * DETECTION_RANGE, params)
+		if result then return result end
+	end
+	return nil
+end
+
+RunService.Heartbeat:Connect(function()
+	if isFlicking then return end
+	
+	
+	forceUpdate()
+
+	local state = humanoid:GetState()
+	if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping then
+		
+		if root.AssemblyLinearVelocity.Y < 12 then
+			local wall = canWallHop()
+			
+			if wall then
+				isFlicking = true
+				
+				
+				rootJoint.C0 = originalC0 * CFrame.Angles(0, 0, math.rad(90))
+				
+				
+				local pushDir = wall.Normal * FLICK_PUSH_FORCE
+				root.AssemblyLinearVelocity = Vector3.new(pushDir.X, FLICK_UP_FORCE, pushDir.Z)
+				
+		
+				task.wait(0.07)
+				rootJoint.C0 = originalC0
+				
+				task.wait(0.03)
+				isFlicking = false
+			end
+		end 
+	end 
+end) 
